@@ -53,79 +53,96 @@ def get_stream_url(video_url):
         info = ydl.extract_info(video_url, download=False)
         return info.get('url'), info.get('title')
 
-# --- Sidebar: Channel Management ---
-st.sidebar.title("📺 채널 목록")
-
-channels = load_channels()
-channel_names = [c['name'] for c in channels]
-
-# Selection
-selected_channel_name = st.sidebar.radio("채널 선택", ["직접 입력"] + channel_names)
-
-# Add New Channel
-with st.sidebar.expander("➕ 채널 추가/삭제"):
-    new_name = st.text_input("이름")
-    new_url = st.text_input("URL (채널 메인 주소)")
-    if st.button("추가"):
-        if new_name and new_url:
-            channels.append({"name": new_name, "url": new_url})
-            save_channels(channels)
-            st.rerun()
-            
-    # Remove Channel (Simple version: remove selected)
-    if selected_channel_name != "직접 입력":
-        if st.button(f"'{selected_channel_name}' 삭제"):
-            channels = [c for c in channels if c['name'] != selected_channel_name]
-            save_channels(channels)
-            st.rerun()
-
-# --- Main Content ---
-st.title("🎬 YouTube Direct Streamer")
+# --- Sidebar: Menu ---
+st.sidebar.title("메뉴")
+menu = st.sidebar.radio("모드 선택", ["내 채널 (구독)", "검색 (음악/영상)"])
 
 video_url_to_play = None
+videos = []
 
-if selected_channel_name == "직접 입력":
-    st.info("보고 싶은 영상의 주소를 직접 입력하세요.")
-    video_url_to_play = st.text_input("YouTube URL", placeholder="https://youtu.be/...")
-else:
-    # Find selected channel URL
-    selected_channel = next((c for c in channels if c['name'] == selected_channel_name), None)
-    if selected_channel:
-        st.header(f"📺 {selected_channel_name}")
-        
-        with st.spinner(f"'{selected_channel_name}'의 최신 영상을 가져오는 중..."):
-            videos = get_channel_videos(selected_channel['url'])
-            
-        if videos:
-            # Display videos in a grid
-            cols = st.columns(2)  # Mobile friendly 2 columns
-            for idx, video in enumerate(videos):
-                with cols[idx % 2]:
-                    # Create a container with border for each video card
-                    with st.container(border=True):
-                        # Construct watch URL
-                        v_url = f"https://www.youtube.com/watch?v={video['id']}"
-                        
-                        # Display Thumbnail (if available) - yt-dlp flat extraction might limit high-res thumbnails, but usually returns 'thumbnails'
-                        # For flat playlist, thumbnails might not be fully populated or just a list. Safe fallback.
-                        # video['title'] is main.
-                        
-                        # Format date (YYYYMMDD -> YYYY-MM-DD)
-                        date_str = video.get('upload_date', '')
-                        if len(date_str) == 8:
-                            formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
-                        else:
-                            formatted_date = ""
+if menu == "내 채널 (구독)":
+    st.sidebar.markdown("---")
+    st.sidebar.title("📺 채널 목록")
+    
+    channels = load_channels()
+    channel_names = [c['name'] for c in channels]
+    
+    # Selection
+    selected_channel_name = st.sidebar.radio("채널 선택", ["직접 입력"] + channel_names)
+    
+    # Add New Channel
+    with st.sidebar.expander("➕ 채널 추가/삭제"):
+        new_name = st.text_input("이름")
+        new_url = st.text_input("URL (채널 메인 주소)")
+        if st.button("추가"):
+            if new_name and new_url:
+                channels.append({"name": new_name, "url": new_url})
+                save_channels(channels)
+                st.rerun()
+                
+        # Remove Channel
+        if selected_channel_name != "직접 입력":
+            if st.button(f"'{selected_channel_name}' 삭제"):
+                channels = [c for c in channels if c['name'] != selected_channel_name]
+                save_channels(channels)
+                st.rerun()
 
-                        st.markdown(f"**{video.get('title', 'No Title')}**")
-                        if formatted_date:
-                            st.caption(f"📅 {formatted_date}")
-                        
-                        if st.button("재생 ▶", key=f"{video['id']}_{idx}"):
-                            video_url_to_play = v_url
-                            
-        else:
-            st.warning("영상을 찾을 수 없습니다.")
+    if selected_channel_name == "직접 입력":
+        st.info("보고 싶은 영상의 주소를 직접 입력하세요.")
+        direct_url = st.text_input("YouTube URL", placeholder="https://youtu.be/...")
+        if st.button("재생 ▶", key="direct_play") and direct_url:
+            video_url_to_play = direct_url
+    else:
+        # Find selected channel URL
+        selected_channel = next((c for c in channels if c['name'] == selected_channel_name), None)
+        if selected_channel:
+            st.header(f"📺 {selected_channel_name}")
+            with st.spinner(f"'{selected_channel_name}'의 최신 영상을 가져오는 중..."):
+                videos = get_channel_videos(selected_channel['url'])
+
+elif menu == "검색 (음악/영상)":
+    st.header("🔍 YouTube 검색")
+    query = st.text_input("검색어 입력", placeholder="예: 아이유, 뉴스, 침착맨...")
+    
+    if query:
+        with st.spinner(f"'{query}' 검색 중..."):
+            ydl_opts = {
+                'playlistend': 10,
+                'quiet': True,
+                'no_warnings': True,
+                'http_headers': {'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'},
+            }
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # use "ytsearchN:" to search N videos
+                    info = ydl.extract_info(f"ytsearch10:{query}", download=False)
+                    if 'entries' in info:
+                        videos = info['entries']
+            except Exception as e:
+                st.error(f"검색 오류: {e}")
+
+# --- Display Video List (Common for both modes) ---
+if videos:
+    # Display videos in a grid
+    cols = st.columns(2)  # Mobile friendly 2 columns
+    for idx, video in enumerate(videos):
+        with cols[idx % 2]:
+            with st.container(border=True):
+                v_url = f"https://www.youtube.com/watch?v={video['id']}"
+                
+                # Format date
+                date_str = video.get('upload_date', '')
+                if len(date_str) == 8:
+                    formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
+                else:
+                    formatted_date = ""
+
+                st.markdown(f"**{video.get('title', 'No Title')}**")
+                if formatted_date:
+                    st.caption(f"📅 {formatted_date}")
+                
+                if st.button("재생 ▶", key=f"{video['id']}_{idx}"):
+                    video_url_to_play = v_url
 
 # --- Video Player ---
 if video_url_to_play:
@@ -133,6 +150,7 @@ if video_url_to_play:
     # Use standard YouTube embed for maximum compatibility and reliability on iOS
     st.success(f"재생 중: {video_url_to_play}")
     st.video(video_url_to_play)
+
 
 
 st.markdown("---")
