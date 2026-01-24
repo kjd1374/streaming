@@ -107,7 +107,7 @@ else:
                         
                         st.markdown(f"**{video.get('title', 'No Title')}**")
                         
-                        if st.button("재생 ▶", key=video['id']):
+                        if st.button("재생 ▶", key=f"{video['id']}_{idx}"):
                             video_url_to_play = v_url
                             
         else:
