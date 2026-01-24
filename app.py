@@ -109,7 +109,16 @@ else:
                         # For flat playlist, thumbnails might not be fully populated or just a list. Safe fallback.
                         # video['title'] is main.
                         
+                        # Format date (YYYYMMDD -> YYYY-MM-DD)
+                        date_str = video.get('upload_date', '')
+                        if len(date_str) == 8:
+                            formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
+                        else:
+                            formatted_date = ""
+
                         st.markdown(f"**{video.get('title', 'No Title')}**")
+                        if formatted_date:
+                            st.caption(f"📅 {formatted_date}")
                         
                         if st.button("재생 ▶", key=f"{video['id']}_{idx}"):
                             video_url_to_play = v_url
@@ -120,16 +129,10 @@ else:
 # --- Video Player ---
 if video_url_to_play:
     st.markdown("---")
-    with st.spinner("재생 준비 중..."):
-        try:
-            stream_url, title = get_stream_url(video_url_to_play)
-            if stream_url:
-                st.success(f"재생 중: {title}")
-                st.video(stream_url)
-            else:
-                st.error("재생할 수 없는 영상입니다.")
-        except Exception as e:
-            st.error(f"오류 발생: {e}")
+    # Use standard YouTube embed for maximum compatibility and reliability on iOS
+    st.success(f"재생 중: {video_url_to_play}")
+    st.video(video_url_to_play)
+
 
 st.markdown("---")
 st.caption("Tip: 왼쪽 사이드바에서 채널을 추가하면 리스트에 유지됩니다. (브라우저 캐시 삭제 시 초기화 될 수 있음)")
