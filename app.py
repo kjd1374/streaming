@@ -22,10 +22,11 @@ def save_channels(channels):
 @st.cache_data(ttl=3600)  # Cache results for 1 hour to speed up
 def get_channel_videos(channel_url):
     ydl_opts = {
-        'extract_flat': True,  # Don't download, just get metadata
-        'playlistend': 10,     # Get latest 10 videos
+        'playlistend': 5,      # Reduce to 5 for speed since we are fetching full info now
         'quiet': True,
         'no_warnings': True,
+        # Force Korean language preference for titles
+        'http_headers': {'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'},
     }
     # Append /videos to ensure we get actual video uploads, not the channel home tabs (Videos, Shorts, etc.)
     if '/@' in channel_url and not channel_url.endswith('/videos'):
