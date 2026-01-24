@@ -27,6 +27,10 @@ def get_channel_videos(channel_url):
         'quiet': True,
         'no_warnings': True,
     }
+    # Append /videos to ensure we get actual video uploads, not the channel home tabs (Videos, Shorts, etc.)
+    if '/@' in channel_url and not channel_url.endswith('/videos'):
+        channel_url += '/videos'
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(channel_url, download=False)
